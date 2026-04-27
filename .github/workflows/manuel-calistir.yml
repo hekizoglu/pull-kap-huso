@@ -28,6 +28,15 @@ jobs:
         pip install .
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         
-    - name: Kodu Çalıştır ve Sonuçları İncele
+    - name: Kodu Çalıştır ve Raporları Oluştur
       run: |
         python ornek_uygulama.py "${{ inputs.hisse_kodu }}"
+        
+    - name: Sonuçları İndirilebilir Dosya Olarak Yükle
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.hisse_kodu }}-KAP-Raporlari
+        path: |
+          *.json
+          *.csv
+        retention-days: 5
