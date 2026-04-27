@@ -14,14 +14,25 @@ def fetch_kap_disclosure_list(year: int, month: int) -> List[Dict]:
     """
     url = f"https://www.kap.org.tr/tr/api/disclosures/year/{year}/month/{month}"
     headers = {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': 'application/json'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
     }
     
     print(f"KAP Bildirim listesi çekiliyor: {year}/{month}")
-    response = requests.get(url, headers=headers, timeout=30)
-    if response.status_code != 200:
-        print(f"Hata: {response.status_code}")
+    response = None
+    import time
+    for attempt in range(3):
+        try:
+            response = requests.get(url, headers=headers, timeout=60)
+            if response.status_code == 200:
+                break
+            print(f"Hata: {response.status_code}. Deneme: {attempt+1}/3")
+        except Exception as e:
+            print(f"Bağlantı hatası: {e}. Deneme: {attempt+1}/3")
+        time.sleep(5)
+        
+    if not response or response.status_code != 200:
         return []
     
     try:
@@ -35,11 +46,20 @@ def fetch_kap_disclosure_list(year: int, month: int) -> List[Dict]:
 def download_pdf(bildirim_id: str) -> bytes:
     """Belirli bir bildirim ID'si için PDF dosyasını indirir."""
     url = f"https://www.kap.org.tr/tr/api/BildirimPdf/{bildirim_id}"
-    response = requests.get(url, timeout=30)
-    if response.status_code == 200:
-        return response.content
-    else:
-        raise Exception(f"PDF indirilemedi. Status: {response.status_code}")
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    }
+    import time
+    for attempt in range(3):
+        try:
+            response = requests.get(url, headers=headers, timeout=60)
+            if response.status_code == 200:
+                return response.content
+        except Exception as e:
+            if attempt == 2:
+                raise Exception(f"PDF indirilemedi. Hata: {e}")
+            time.sleep(5)
+    raise Exception(f"PDF indirilemedi. Status: {response.status_code if 'response' in locals() and response else 'Bilinmiyor'}")
 
 def gemini_pdf_parse(pdf_content: bytes, api_key: str, sirket_adi: str) -> List[Dict]:
     """

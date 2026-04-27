@@ -106,7 +106,7 @@ class BISTCompany(object):
         """Fetch and parse all available financial report data for this company.
 
         Returns:
-            A dict keyed by period string (e.g. ``'2023Yıllık'``), where each
+            A dict keyed by period string (e.g. ``'2026Yıllık'``), where each
             value is a dict containing ``year``, ``term``, ``disc_ind``, and
             ``results`` (the parsed financial line items).
         """
