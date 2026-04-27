@@ -38,5 +38,5 @@ jobs:
         name: ${{ inputs.hisse_kodu }}-KAP-Raporlari
         path: |
           *.json
-          *.csv
+          *.pdf
         retention-days: 5
