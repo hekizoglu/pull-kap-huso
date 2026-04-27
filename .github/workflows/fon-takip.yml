@@ -1,16 +1,24 @@
-name: Yatırım Fonu Portföy Takip (Gemini AI)
+name: Yatırım Fonu Portföy Takip (Gemini & DeepSeek)
 
 on:
   workflow_dispatch:
     inputs:
       yil:
-        description: 'Veri çekilecek Yıl (örn: 2024)'
+        description: 'Yıl (YYYY)'
         required: true
         default: '2024'
       ay:
-        description: 'Veri çekilecek Ay (1-12)'
+        description: 'Ay (1-12)'
         required: true
         default: '3'
+      model:
+        description: 'Kullanılacak Yapay Zeka Modeli'
+        required: true
+        default: 'gemini'
+        type: choice
+        options:
+        - gemini
+        - deepseek
 
 jobs:
   analyze-funds:
@@ -33,14 +41,15 @@ jobs:
     - name: Fon Analizini Başlat
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
       run: |
-        python fon_analizi.py "${{ inputs.yil }}" "${{ inputs.ay }}"
+        python fon_analizi.py "${{ inputs.yil }}" "${{ inputs.ay }}" "${{ inputs.model }}"
         
     - name: Analiz Sonuçlarını Yükle
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: Fon-Portfoy-Analizi-${{ inputs.yil }}-${{ inputs.ay }}
+        name: Fon-Analizi-${{ inputs.model }}-${{ inputs.yil }}-${{ inputs.ay }}
         path: |
           *.json
           *.csv

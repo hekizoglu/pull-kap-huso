@@ -2,6 +2,9 @@ import requests
 import json
 import base64
 import google.generativeai as genai
+import pdfplumber
+import io
+from openai import OpenAI
 from typing import List, Dict
 
 def fetch_kap_disclosure_list(year: int, month: int) -> List[Dict]:
@@ -62,18 +65,77 @@ Tablodaki her satır için şu JSON array'i döndür (başka hiçbir şey yazma)
         ])
         
         text = response.text.strip()
-        # JSON bloğunu temizle (bazı durumlarda Gemini ```json ekleyebilir)
+        # JSON bloğunu temizle
         if text.startswith("```json"):
             text = text[7:-3].strip()
         elif text.startswith("```"):
             text = text[3:-3].strip()
             
         kayitlar = json.loads(text)
-        # Şirket adını doldur (Eğer PDF'den gelmediyse)
         for k in kayitlar:
             if not k.get('fund_company_name'):
                 k['fund_company_name'] = sirket_adi
         return kayitlar
     except Exception as e:
         print(f"Gemini parse hatası: {e}")
+        return []
+
+def extract_text_from_pdf(pdf_content: bytes) -> str:
+    """PDF içeriğinden metni çıkarır."""
+    text = ""
+    try:
+        with pdfplumber.open(io.BytesIO(pdf_content)) as pdf:
+            for page in pdf.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    text += extracted + "\n"
+    except Exception as e:
+        print(f"Metin çıkarma hatası: {e}")
+    return text
+
+def deepseek_pdf_parse(pdf_content: bytes, api_key: str, sirket_adi: str) -> List[Dict]:
+    """
+    DeepSeek API kullanarak PDF metninden portföy verilerini ayıklar.
+    """
+    client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+    
+    print("   -> PDF'den metin ayıklanıyor...")
+    pdf_text = extract_text_from_pdf(pdf_content)
+    
+    if not pdf_text.strip():
+        print("   -> HATA: PDF'den metin çıkarılamadı (Resim formatında olabilir).")
+        return []
+
+    prompt = f"""Aşağıda bir Türk yatırım fonunun portföy dağılım raporu metni yer almaktadır.
+Bu metindeki hisse senedi portföy tablosunu bul ve her bir hisse senedi satırı için şu JSON array'ini döndür:
+[
+  {{"fund_company_name": "{sirket_adi}", "fund_name": "", "ticker": "", "isin": "", "weight_pct": 0.0, "position_try": 0.0, "report_date": ""}}
+]
+- Sadece JSON döndür.
+- Hisse senedi olmayan (nakit, repo vb.) satırları dahil etme.
+
+METİN:
+{pdf_text[:15000]}
+"""
+
+    try:
+        print("   -> DeepSeek AI ile analiz yapılıyor...")
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": "Sen finansal tabloları JSON formatına dönüştüren uzman bir asistansın."},
+                {"role": "user", "content": prompt},
+            ],
+            stream=False
+        )
+        
+        text = response.choices[0].message.content.strip()
+        if text.startswith("```json"):
+            text = text[7:-3].strip()
+        elif text.startswith("```"):
+            text = text[3:-3].strip()
+            
+        return json.loads(text)
+    except Exception as e:
+        print(f"DeepSeek parse hatası: {e}")
         return []
